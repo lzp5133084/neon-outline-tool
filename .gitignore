@@ -1,0 +1,5 @@
+_shots/
+_backup/
+test_input.png
+verify_output.png
+_verify.py

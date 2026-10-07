@@ -413,21 +413,21 @@
           for(var kx = -1; kx <= 1; kx++){
             var px = x + kx, py = y + ky;
             if(px < 0 || px >= w || py < 0 || py >= h){ continue; }
-            var idx = ((y0 + py) * (canvas.width) + (x0 + px)) * 4;
+            // 注意：getImageData(x0,y0,w,h) 返回的 data 是选区局部坐标，索引用 (py*w+px)*4
+            var idx = (py * w + px) * 4;
             var gray = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
-            var wx = kx, wy = ky;
             gx += gray * (kx === 0 ? 0 : (kx * (ky === 0 ? 2 : 1)));
             gy += gray * (ky === 0 ? 0 : (ky * (kx === 0 ? 2 : 1)));
           }
         }
         var mag = Math.sqrt(gx*gx + gy*gy);
-        gw[i++] = mag > threshold ? mag : 0;
+        gw[i++] = mag;
       }
     }
-    // 非极大值抑制 + 只保留强边缘
+    // 自适应阈值：保留显著强边缘（灵敏度由 slider 与最大梯度共同决定）
     var magMax = 0;
     for(var j = 0; j < w*h; j++) if(gw[j] > magMax) magMax = gw[j];
-    var threshVal = Math.max(threshold, magMax * 0.15);
+    var threshVal = Math.max(threshold * 0.5, magMax * 0.12);
     for(var j2 = 0; j2 < w*h; j2++) gw[j2] = gw[j2] > threshVal ? gw[j2] : 0;
     return gw;
   }
@@ -448,7 +448,7 @@
       for(var y = 0; y < h; y++){
         for(var x = 0; x < w; x++){
           if(edgeArr[y*w + x] > 0){
-            var px = selection.x + x, py = selection.y + y;
+            var px = Math.round(selection.x) + x, py = Math.round(selection.y) + y;
             ctx.beginPath();
             ctx.arc(px, py, pass === 0 ? lineW : Math.max(0.6, lineW*0.45), 0, Math.PI*2);
             ctx.fill();
@@ -490,6 +490,9 @@
       var s = selection;
       var x0 = Math.floor(s.x), y0 = Math.floor(s.y);
       var w = Math.max(2, Math.floor(s.w)), h = Math.max(2, Math.floor(s.h));
+      if(x0 + w > imgW) w = imgW - x0;
+      if(y0 + h > imgH) h = imgH - y0;
+      if(w < 2 || h < 2){ showStatus("选区太小", "err"); return; }
       var regionData = ctx.getImageData(x0, y0, w, h);
       var thresh = parseInt(thresholdEl.value, 10);
       var edges = sobelEdges(regionData.data, x0, y0, w, h, thresh);
